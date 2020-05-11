@@ -6,19 +6,19 @@
 
 // the setup function runs once when you press reset or power the board
 
-// ����������
-#include <DHT.h>
+// libraries
 #include <Wire.h>
 #include <GyverEncoder.h>
 #include <U8glib.h>
 #include <GyverRelay.h>
 #include <HTU21D.h>
 
-//���������
+
+//some defines
 #define CLK 11			//encoder button
 #define DT 10
 #define SW 9
-
+#define NUM_READINGS 7		//number of readings for avarage
 #define pinRELE1 1			//pin rele 1
 #define pinRELE2 2			//pin rele 2
 #define pinRELE3 3			//pin rele 3
@@ -34,8 +34,7 @@ U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI
 GyverRelay regulator_temp(REVERSE);
 GyverRelay regulator_hum(REVERSE);
 Encoder enc1(CLK, DT, SW);
-HTU21D HUMP_TEMP;
-DHT dht(pinTEMP1, DHT11);
+HTU21D HTSensor;
 
 
 float refHUM = 90.0;	// reference humiliation value
@@ -51,7 +50,6 @@ float TEMP_1 = 0;
 float TEMP_2 = 0;
 float HUM1 = 0;
 float HUM2 = 0;
-
 bool heating = false;
 bool cooling = false;
 
@@ -63,7 +61,7 @@ bool drying = false;
 
 void setup() {
     u8g.setFont(u8g_font_unifontr);
-    dht.begin();
+	HTSensor.begin();
 }
 void temp_regulator() {
     if (TEMP_2 <= refTEMP - hystTEMP/2) {
@@ -147,13 +145,17 @@ void loop() {
 
         mainview();
     } while (u8g.nextPage());
-    TEMP_1 = dht.readTemperature();
-    HUM1 = dht.readHumidity();
-    TEMP_2 = HUMP_TEMP.readTemperature();
-    HUM2 = HUMP_TEMP.readHumidity();
+	float sum_temp = 0;
+	float sum_hum = 0;
+	for (int i = 0; i < NUM_READINGS; i++) {
+		sum_temp += HTSensor.readTemperature();
+		sum_hum += HTSensor.readHumidity();
+	}
+    TEMP_2 = sum_temp / NUM_READINGS;
+	HUM2 = sum_hum / NUM_READINGS;
     temp_regulator();
     hum_regulator();
     // rebuild the picture after some delay
-    delay(500);
+    delay(100);
   
 }
