@@ -10,8 +10,10 @@
 #include <Wire.h>
 #include <GyverEncoder.h>
 #include <U8glib.h>
-#include <GyverRelay.h>
+//#include <GyverRelay.h>
 #include <HTU21D.h>
+#include <TimeLib.h>
+#include <DS1307RTC.h>
 
 
 //some defines
@@ -19,8 +21,10 @@
 #define DT 10
 #define SW 9
 #define NUM_READINGS 7		//number of readings for avarage
-#define pinRELE1 1			//pin rele 1
-#define pinRELE2 2			//pin rele 2
+
+#define heatRELE 12			//pin for heating relay
+#define coolRELE 13			//pin for colling relay
+#define wetRELE 8           //pin for wetting relay
 #define pinRELE3 3			//pin rele 3
 
 #define pinTEMP1 7			//pin temperature1 sensor
@@ -31,8 +35,8 @@
 #define BIGSTEP 1		//step changing big
 U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI 
 //
-GyverRelay regulator_temp(REVERSE);
-GyverRelay regulator_hum(REVERSE);
+//GyverRelay regulator_temp(REVERSE);
+//GyverRelay regulator_hum(REVERSE);
 Encoder enc1(CLK, DT, SW);
 HTU21D HTSensor;
 
@@ -62,21 +66,35 @@ bool drying = false;
 void setup() {
     u8g.setFont(u8g_font_unifontr);
 	HTSensor.begin();
+    pinMode(heatRELE, OUTPUT);
+    pinMode(coolRELE, OUTPUT);
+    digitalWrite(heatRELE, LOW);
+    digitalWrite(coolRELE, LOW);
+    
 }
+//Temperature regulating
 void temp_regulator() {
     if (TEMP_2 <= refTEMP - hystTEMP/2) {
         heating = true;
         cooling = false;
+        digitalWrite(heatRELE, !heating);
+        digitalWrite(coolRELE, !cooling);
     }
     if (TEMP_2 >= refTEMP + hystTEMP / 2) {
         heating = false;
         cooling = true;
+        digitalWrite(heatRELE, !heating);
+        digitalWrite(coolRELE, !cooling);
     }
     if (TEMP_2 <= refTEMP + hystTEMP/2 && TEMP_2  >= refTEMP - hystTEMP / 2) {
         heating = false;
         cooling = false;
+        digitalWrite(heatRELE, !heating);
+        digitalWrite(coolRELE, !cooling);
     }
+   
 }
+//Humiliation regulating
 void hum_regulator() {
     if (HUM2 <= refHUM - hystHUM / 2) {
         wetting = true;
@@ -96,7 +114,7 @@ void hum_regulator() {
 
 
 void mainview() {
-
+    tmElements_t tm;
     //Temperature block
     u8g.drawStr(0, 10, "TEMP");
     u8g.setPrintPos(2, 24);
@@ -116,9 +134,19 @@ void mainview() {
     }
 
 
-    u8g.drawVLine(62, 0, 64); //separating
+    u8g.drawVLine(62, 0, 50); //separating
 
+    //time block
+    if (RTC.read(tm)) {
+        u8g.setPrintPos(43, 64);
+        u8g.print(tm.Hour);
+        u8g.setPrintPos(58, 64);
+        u8g.print(":");
+        u8g.setPrintPos(64, 64);
+        u8g.print(tm.Minute);
 
+    }
+    
     //Humidity block
     u8g.drawStr(66, 10, "HUM");
     u8g.setPrintPos(68, 24);
