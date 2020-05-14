@@ -20,46 +20,43 @@
 #define CLK 11			//encoder button
 #define DT 10
 #define SW 9
-#define NUM_READINGS 7		//number of readings for avarage
+#define NUM_READINGS 10		//number of readings for avarage
 
 #define heatRELE 12			//pin for heating relay
 #define coolRELE 13			//pin for colling relay
 #define wetRELE 8           //pin for wetting relay
 #define pinRELE3 3			//pin rele 3
 
-#define pinTEMP1 7			//pin temperature1 sensor
-#//define pinTEMP2 7			//pin temperature2 sensor
-//#define pinHUM 8			//pin temperature3 sensor
-
 #define SMALLSTEP 0.1	//step changing slow
 #define BIGSTEP 1		//step changing big
+
 U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI 
 //
 //GyverRelay regulator_temp(REVERSE);
 //GyverRelay regulator_hum(REVERSE);
-Encoder enc1(CLK, DT, SW);
+Encoder enc(CLK, DT, SW);
 HTU21D HTSensor;
 
 
 float refHUM = 90.0;	// reference humiliation value
-float refTEMP = 23.5;	// reference temperature value
+float refTEMP = 24.5;	// reference temperature value
 
-float hystTEMP = 3.0;	// hysteresis for temperature
+float hystTEMP = 3;	// hysteresis for temperature
 float hystHUM = 5.0;	// hysteresis for humiliation
 
 float fbTEMP = 0.5;		// koef os for temperature 
 float fbHUM = 0.5;		// koef os for humiliation
 
-float TEMP_1 = 0;
-float TEMP_2 = 0;
-float HUM1 = 0;
-float HUM2 = 0;
+//float TEMP_1 = 0;
+float TEMP_2 = 23.5;
+//float HUM1 = 0;
+float HUM2 = 90;
 bool heating = false;
 bool cooling = false;
 
 bool wetting = false;
 bool drying = false;
-
+tmElements_t tm;
 
 
 
@@ -70,23 +67,24 @@ void setup() {
     pinMode(coolRELE, OUTPUT);
     digitalWrite(heatRELE, LOW);
     digitalWrite(coolRELE, LOW);
+
     
 }
 //Temperature regulating
 void temp_regulator() {
-    if (TEMP_2 <= refTEMP - hystTEMP/2) {
+    if (TEMP_2 <= refTEMP - hystTEMP * 0.5) {
         heating = true;
         cooling = false;
         digitalWrite(heatRELE, !heating);
         digitalWrite(coolRELE, !cooling);
     }
-    if (TEMP_2 >= refTEMP + hystTEMP / 2) {
+    if (TEMP_2 >= refTEMP + hystTEMP * 0.5) {
         heating = false;
         cooling = true;
         digitalWrite(heatRELE, !heating);
         digitalWrite(coolRELE, !cooling);
     }
-    if (TEMP_2 <= refTEMP + hystTEMP/2 && TEMP_2  >= refTEMP - hystTEMP / 2) {
+    if (TEMP_2 <= refTEMP + hystTEMP * 0.5 && TEMP_2  >= refTEMP - hystTEMP * 0.5) {
         heating = false;
         cooling = false;
         digitalWrite(heatRELE, !heating);
@@ -96,15 +94,15 @@ void temp_regulator() {
 }
 //Humiliation regulating
 void hum_regulator() {
-    if (HUM2 <= refHUM - hystHUM / 2) {
+    if (HUM2 <= refHUM - hystHUM * 0.5) {
         wetting = true;
         drying = false;
     }
-    if (HUM2 >= refHUM + hystHUM / 2) {
+    if (HUM2 >= refHUM + hystHUM * 0.5) {
         wetting = false;
         drying = true;
     }
-    if (HUM2 <= refHUM + hystHUM / 2 && HUM2 >= refHUM - hystHUM / 2) {
+    if (HUM2 <= refHUM + hystHUM * 0.5 && HUM2 >= refHUM - hystHUM * 0.5) {
         wetting = false;
         drying = false;
     }
@@ -114,7 +112,7 @@ void hum_regulator() {
 
 
 void mainview() {
-    tmElements_t tm;
+;
     //Temperature block
     u8g.drawStr(0, 10, "TEMP");
     u8g.setPrintPos(2, 24);
