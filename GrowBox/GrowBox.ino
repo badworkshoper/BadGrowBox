@@ -57,7 +57,7 @@ bool cooling = false;
 bool wetting = false;
 bool drying = false;
 tmElements_t tm;
-
+int8_t menu = 0;
 
 
 void setup() {
@@ -112,7 +112,7 @@ void hum_regulator() {
 
 
 void mainview() {
-;
+
     //Temperature block
     u8g.drawStr(0, 10, "TEMP");
     u8g.setPrintPos(2, 24);
@@ -162,15 +162,90 @@ void mainview() {
     if (wetting == false && drying == false) {
         u8g.drawStr(66, 50, "OK");
     }
+
+    if (menu == 1) {
+        u8g.setPrintPos(50, 38);
+        u8g.print("*");
+    }
+    if (menu == 2) {
+        u8g.setPrintPos(120, 38);
+        u8g.print("*");
+    }
 }
+
 
 // the loop function runs over and over again until power down or reset
 void loop() {
+    //enc.tick();
+    if (enc.isClick()) {
+        menu++;
+        if (menu > 2) {
+            menu = 0;
+        }
+
+    }
     u8g.firstPage();
     do {
-
+        if (menu == 1) {
+            if (enc.isRight()) {
+                refTEMP += SMALLSTEP;
+            }
+            if (enc.isFastR()) {
+                refTEMP += BIGSTEP;
+            }
+            if (enc.isLeft()) {
+                refTEMP -= SMALLSTEP;
+            }
+            if (enc.isFastL()) {
+                refTEMP -= BIGSTEP;
+            }
+        }
+        if (menu == 2) {
+            if (enc.isRight()) {
+                refHUM += SMALLSTEP;
+            }
+            if (enc.isFastR()) {
+                refHUM += BIGSTEP;
+            }
+            if (enc.isLeft()) {
+                refHUM -= SMALLSTEP;
+            }
+            if (enc.isFastL()) {
+                refHUM -= BIGSTEP;
+            }
+        }
         mainview();
     } while (u8g.nextPage());
+
+    if (menu == 1) {
+        if (enc.isRight()) {
+            refTEMP += SMALLSTEP;
+        }
+        if (enc.isFastR()) {
+            refTEMP += BIGSTEP;
+        }
+        if (enc.isLeft()) {
+            refTEMP -= SMALLSTEP;
+        }
+        if (enc.isFastL()) {
+            refTEMP -= BIGSTEP;
+        }
+    }
+    if (menu == 2) {
+        if (enc.isRight()) {
+            refHUM += SMALLSTEP;
+        }
+        if (enc.isFastR()) {
+            refHUM += BIGSTEP;
+        }
+        if (enc.isLeft()) {
+            refHUM -= SMALLSTEP;
+        }
+        if (enc.isFastL()) {
+            refHUM -= BIGSTEP;
+        }
+    }
+
 	float sum_temp = 0;
 	float sum_hum = 0;
 	for (int i = 0; i < NUM_READINGS; i++) {
