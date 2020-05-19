@@ -10,10 +10,10 @@
 #include <Wire.h>
 #include <GyverEncoder.h>
 #include <U8glib.h>
-//#include <GyverRelay.h>
 #include <HTU21D.h>
 #include <TimeLib.h>
 #include <DS1307RTC.h>
+
 
 
 //some defines
@@ -30,12 +30,14 @@
 #define SMALLSTEP 0.1	//step changing slow
 #define BIGSTEP 1		//step changing big
 
+
 U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI 
-//
-//GyverRelay regulator_temp(REVERSE);
-//GyverRelay regulator_hum(REVERSE);
+
 Encoder enc(CLK, DT, SW);
 HTU21D HTSensor;
+
+int period = 100;
+unsigned long time_now = 0;
 
 
 float refHUM = 90.0;	// reference humiliation value
@@ -43,9 +45,6 @@ float refTEMP = 24.5;	// reference temperature value
 
 float hystTEMP = 3;	// hysteresis for temperature
 float hystHUM = 5.0;	// hysteresis for humiliation
-
-float fbTEMP = 0.5;		// koef os for temperature 
-float fbHUM = 0.5;		// koef os for humiliation
 
 //float TEMP_1 = 0;
 float TEMP_2 = 23.5;
@@ -57,19 +56,26 @@ bool cooling = false;
 bool wetting = false;
 bool drying = false;
 tmElements_t tm;
-int8_t menu = 0;
+int menu = 0;
 
 
 void setup() {
+	enc.setType(TYPE2);
+	//enc.setTickMode(AUTO);
     u8g.setFont(u8g_font_unifontr);
+	delay(100);
+	Serial.begin(9600);
+
 	HTSensor.begin();
     pinMode(heatRELE, OUTPUT);
     pinMode(coolRELE, OUTPUT);
     digitalWrite(heatRELE, LOW);
     digitalWrite(coolRELE, LOW);
-
     
 }
+
+
+
 //Temperature regulating
 void temp_regulator() {
     if (TEMP_2 <= refTEMP - hystTEMP * 0.5) {
@@ -107,9 +113,6 @@ void hum_regulator() {
         drying = false;
     }
 }
-
-
-
 
 void mainview() {
 
@@ -163,100 +166,75 @@ void mainview() {
         u8g.drawStr(66, 50, "OK");
     }
 
-    if (menu == 1) {
-        u8g.setPrintPos(50, 38);
-        u8g.print("*");
-    }
-    if (menu == 2) {
-        u8g.setPrintPos(120, 38);
-        u8g.print("*");
-    }
+	switch (menu) {
+	case 0:
+		break;
+	case 1:
+		u8g.setPrintPos(50, 38);
+		u8g.print("*");
+		break;
+	case 2:
+		u8g.setPrintPos(120, 38);
+		u8g.print("*");
+		break;
+	}
 }
 
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-    //enc.tick();
-    if (enc.isClick()) {
-        menu++;
-        if (menu > 2) {
-            menu = 0;
-        }
+	enc.tick();
+	if (enc.isClick()) {
+		menu++;
+		if (menu > 2) {
+			menu = 0;
+		}
+	}
 
-    }
     u8g.firstPage();
-    do {
-        if (menu == 1) {
-            if (enc.isRight()) {
-                refTEMP += SMALLSTEP;
-            }
-            if (enc.isFastR()) {
-                refTEMP += BIGSTEP;
-            }
-            if (enc.isLeft()) {
-                refTEMP -= SMALLSTEP;
-            }
-            if (enc.isFastL()) {
-                refTEMP -= BIGSTEP;
-            }
-        }
-        if (menu == 2) {
-            if (enc.isRight()) {
-                refHUM += SMALLSTEP;
-            }
-            if (enc.isFastR()) {
-                refHUM += BIGSTEP;
-            }
-            if (enc.isLeft()) {
-                refHUM -= SMALLSTEP;
-            }
-            if (enc.isFastL()) {
-                refHUM -= BIGSTEP;
-            }
-        }
+	do {
         mainview();
     } while (u8g.nextPage());
 
-    if (menu == 1) {
-        if (enc.isRight()) {
-            refTEMP += SMALLSTEP;
-        }
-        if (enc.isFastR()) {
-            refTEMP += BIGSTEP;
-        }
-        if (enc.isLeft()) {
-            refTEMP -= SMALLSTEP;
-        }
-        if (enc.isFastL()) {
-            refTEMP -= BIGSTEP;
-        }
-    }
-    if (menu == 2) {
-        if (enc.isRight()) {
-            refHUM += SMALLSTEP;
-        }
-        if (enc.isFastR()) {
-            refHUM += BIGSTEP;
-        }
-        if (enc.isLeft()) {
-            refHUM -= SMALLSTEP;
-        }
-        if (enc.isFastL()) {
-            refHUM -= BIGSTEP;
-        }
-    }
+	if (enc.isRight()) {
+		if (menu == 1) {
+			refTEMP += SMALLSTEP;
+		}
+		if (menu == 2) {
+			refHUM += SMALLSTEP;
+		}
+		Serial.println("Right");
+	}
+
+	if (enc.isLeft()) {
+		if (menu == 1) {
+		refTEMP -= SMALLSTEP;
+		}
+		if (menu == 2) {
+			refHUM -= SMALLSTEP;
+		}
+		Serial.println("Left");
+	}
 
 	float sum_temp = 0;
 	float sum_hum = 0;
+	/*
 	for (int i = 0; i < NUM_READINGS; i++) {
 		sum_temp += HTSensor.readTemperature();
 		sum_hum += HTSensor.readHumidity();
 	}
+
     TEMP_2 = sum_temp / NUM_READINGS;
 	HUM2 = sum_hum / NUM_READINGS;
+	*/
+
+	TEMP_2 = HTSensor.readTemperature();
+	HUM2 = HTSensor.readHumidity();
     temp_regulator();
     hum_regulator();
-    // rebuild the picture after some delay
-    delay(100);
+
+	if (millis() >= time_now + period) {
+		time_now += period;
+	}
   
 }
