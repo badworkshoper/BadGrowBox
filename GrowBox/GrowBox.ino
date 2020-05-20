@@ -7,6 +7,7 @@
 // the setup function runs once when you press reset or power the board
 
 // libraries
+//#include <encMinim.h>
 #include <Wire.h>
 #include <GyverEncoder.h>
 #include <U8glib.h>
@@ -16,10 +17,12 @@
 
 
 
+
 //some defines
-#define CLK 11			//encoder button
-#define DT 10
 #define SW 9
+#define DT 10
+#define CLK 11
+
 #define NUM_READINGS 10		//number of readings for avarage
 
 #define heatRELE 12			//pin for heating relay
@@ -27,7 +30,7 @@
 #define wetRELE 8           //pin for wetting relay
 #define pinRELE3 3			//pin rele 3
 
-#define SMALLSTEP 0.1	//step changing slow
+#define SMALLSTEP 10	//step changing slow
 #define BIGSTEP 1		//step changing big
 
 
@@ -36,7 +39,7 @@ U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI
 Encoder enc(CLK, DT, SW);
 HTU21D HTSensor;
 
-int period = 100;
+int period = 40;
 unsigned long time_now = 0;
 
 
@@ -50,6 +53,9 @@ float hystHUM = 5.0;	// hysteresis for humiliation
 float TEMP_2 = 23.5;
 //float HUM1 = 0;
 float HUM2 = 90;
+float TEMPArray[NUM_READINGS];
+float HUMArray[NUM_READINGS];
+
 bool heating = false;
 bool cooling = false;
 
@@ -57,15 +63,16 @@ bool wetting = false;
 bool drying = false;
 tmElements_t tm;
 int menu = 0;
+int i = 0;
 
+float timetovoid = 0;
 
 void setup() {
-	enc.setType(TYPE2);
 	//enc.setTickMode(AUTO);
-    u8g.setFont(u8g_font_unifontr);
-	delay(100);
+    enc.setType(TYPE2);
+    //delay(100);
 	Serial.begin(9600);
-
+    u8g.setFont(u8g_font_unifontr);
 	HTSensor.begin();
     pinMode(heatRELE, OUTPUT);
     pinMode(coolRELE, OUTPUT);
@@ -78,6 +85,7 @@ void setup() {
 
 //Temperature regulating
 void temp_regulator() {
+   
     if (TEMP_2 <= refTEMP - hystTEMP * 0.5) {
         heating = true;
         cooling = false;
@@ -96,6 +104,7 @@ void temp_regulator() {
         digitalWrite(heatRELE, !heating);
         digitalWrite(coolRELE, !cooling);
     }
+   
    
 }
 //Humiliation regulating
@@ -147,6 +156,8 @@ void mainview() {
         u8g.print(tm.Minute);
 
     }
+    //u8g.setPrintPos(43, 64);
+    //u8g.print(timetovoid);
     
     //Humidity block
     u8g.drawStr(66, 10, "HUM");
@@ -179,10 +190,37 @@ void mainview() {
 		break;
 	}
 }
+float arraySUM(float array[]) {
+    float sum = 0;
+    for (int a = 0; a <= NUM_READINGS - 1; a++) {
+        sum += array[a];
+    }
+    sum = sum / NUM_READINGS;
+    return sum;
+}
 
+void filtering() {
+    TEMPArray[i] = HTSensor.readTemperature();
+    HUMArray[i] = HTSensor.readHumidity();
+    float temp = 0;
+    float hum = 0;
+    switch (i) {
+    case NUM_READINGS:
+        TEMP_2 = arraySUM(TEMPArray);
+        HUM2 = arraySUM(HUMArray);
+        i = -1;
+        break;
+    default:
+        break;
+    }
+    i++;
+}
 
 // the loop function runs over and over again until power down or reset
 void loop() {
+    if (millis() >= time_now + period) {
+        time_now += period;
+    }
 	enc.tick();
 	if (enc.isClick()) {
 		menu++;
@@ -198,43 +236,24 @@ void loop() {
 
 	if (enc.isRight()) {
 		if (menu == 1) {
-			refTEMP += SMALLSTEP;
+			refTEMP += SMALLSTEP * 0.01;
 		}
 		if (menu == 2) {
-			refHUM += SMALLSTEP;
+			refHUM += SMALLSTEP * 0.01;
 		}
-		Serial.println("Right");
+	    Serial.println("Right");
 	}
 
 	if (enc.isLeft()) {
 		if (menu == 1) {
-		refTEMP -= SMALLSTEP;
+		refTEMP -= SMALLSTEP *0.01;
 		}
 		if (menu == 2) {
-			refHUM -= SMALLSTEP;
+			refHUM -= SMALLSTEP * 0.01;
 		}
 		Serial.println("Left");
 	}
-
-	float sum_temp = 0;
-	float sum_hum = 0;
-	/*
-	for (int i = 0; i < NUM_READINGS; i++) {
-		sum_temp += HTSensor.readTemperature();
-		sum_hum += HTSensor.readHumidity();
-	}
-
-    TEMP_2 = sum_temp / NUM_READINGS;
-	HUM2 = sum_hum / NUM_READINGS;
-	*/
-
-	TEMP_2 = HTSensor.readTemperature();
-	HUM2 = HTSensor.readHumidity();
-    temp_regulator();
-    hum_regulator();
-
-	if (millis() >= time_now + period) {
-		time_now += period;
-	}
-  
+    //filtering();
+    //temp_regulator();
+    //hum_regulator();
 }
