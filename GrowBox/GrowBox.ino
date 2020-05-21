@@ -16,8 +16,6 @@
 #include <DS1307RTC.h>
 
 
-
-
 //some defines
 #define SW 9
 #define DT 10
@@ -30,8 +28,8 @@
 #define wetRELE 8           //pin for wetting relay
 #define pinRELE3 3			//pin rele 3
 
-#define SMALLSTEP 10	//step changing slow
-#define BIGSTEP 1		//step changing big
+
+#define STEPCHANGE 10	//step changing slow
 
 
 U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI 
@@ -39,22 +37,19 @@ U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);	// I2C / TWI
 Encoder enc(CLK, DT, SW);
 HTU21D HTSensor;
 
-int period = 40;
+
+int period = 20000;
 unsigned long time_now = 0;
 
 
-float refHUM = 90.0;	// reference humiliation value
-float refTEMP = 24.5;	// reference temperature value
+int refHUM = 9000;	// reference humiliation value
+int refTEMP = 2450;	// reference temperature value
 
-float hystTEMP = 3;	// hysteresis for temperature
-float hystHUM = 5.0;	// hysteresis for humiliation
+int hystTEMP = 30;	// hysteresis for temperature
+int hystHUM = 100;	// hysteresis for humiliation
 
-//float TEMP_1 = 0;
-float TEMP_2 = 23.5;
-//float HUM1 = 0;
-float HUM2 = 90;
-float TEMPArray[NUM_READINGS];
-float HUMArray[NUM_READINGS];
+int TEMP1 = 2350;
+int HUM1 = 9000;
 
 bool heating = false;
 bool cooling = false;
@@ -62,10 +57,12 @@ bool cooling = false;
 bool wetting = false;
 bool drying = false;
 tmElements_t tm;
+
 int menu = 0;
 int i = 0;
 
-float timetovoid = 0;
+bool redraw = false;
+
 
 void setup() {
 	//enc.setTickMode(AUTO);
@@ -86,38 +83,38 @@ void setup() {
 //Temperature regulating
 void temp_regulator() {
    
-    if (TEMP_2 <= refTEMP - hystTEMP * 0.5) {
+    if (TEMP1 <= refTEMP - hystTEMP * 0.5) {
         heating = true;
         cooling = false;
         digitalWrite(heatRELE, !heating);
         digitalWrite(coolRELE, !cooling);
     }
-    if (TEMP_2 >= refTEMP + hystTEMP * 0.5) {
+    if (TEMP1 >= refTEMP + hystTEMP * 0.5) {
         heating = false;
         cooling = true;
         digitalWrite(heatRELE, !heating);
         digitalWrite(coolRELE, !cooling);
     }
-    if (TEMP_2 <= refTEMP + hystTEMP * 0.5 && TEMP_2  >= refTEMP - hystTEMP * 0.5) {
+    if (TEMP1 <= refTEMP + hystTEMP * 0.5 && TEMP1  >= refTEMP - hystTEMP * 0.5) {
         heating = false;
         cooling = false;
         digitalWrite(heatRELE, !heating);
         digitalWrite(coolRELE, !cooling);
     }
    
-   
+    redraw = true;
 }
 //Humiliation regulating
 void hum_regulator() {
-    if (HUM2 <= refHUM - hystHUM * 0.5) {
+    if (HUM1 <= refHUM - hystHUM * 0.5) {
         wetting = true;
         drying = false;
     }
-    if (HUM2 >= refHUM + hystHUM * 0.5) {
+    if (HUM1 >= refHUM + hystHUM * 0.5) {
         wetting = false;
         drying = true;
     }
-    if (HUM2 <= refHUM + hystHUM * 0.5 && HUM2 >= refHUM - hystHUM * 0.5) {
+    if (HUM1 <= refHUM + hystHUM * 0.5 && HUM1 >= refHUM - hystHUM * 0.5) {
         wetting = false;
         drying = false;
     }
@@ -128,10 +125,10 @@ void mainview() {
     //Temperature block
     u8g.drawStr(0, 10, "TEMP");
     u8g.setPrintPos(2, 24);
-    u8g.print(refTEMP);
+    u8g.print(refTEMP * 0.01);
     u8g.drawFrame(0, 12, 50, 14); // frame ref value
     u8g.setPrintPos(2, 38);
-    u8g.print(TEMP_2);
+    u8g.print(TEMP1 * 0.01);
     if (cooling) {
         u8g.drawStr(0, 50, "cooling");
     }
@@ -162,10 +159,10 @@ void mainview() {
     //Humidity block
     u8g.drawStr(66, 10, "HUM");
     u8g.setPrintPos(68, 24);
-    u8g.print(refHUM);
+    u8g.print(refHUM * 0.01);
     u8g.drawFrame(66, 12, 50, 14); // frame ref value
     u8g.setPrintPos(68, 38);
-    u8g.print(HUM2);
+    u8g.print(HUM1 * 0.01);
     if (drying) {
         u8g.drawStr(66, 50, "drying");
     }
@@ -190,70 +187,60 @@ void mainview() {
 		break;
 	}
 }
-float arraySUM(float array[]) {
-    float sum = 0;
-    for (int a = 0; a <= NUM_READINGS - 1; a++) {
-        sum += array[a];
-    }
-    sum = sum / NUM_READINGS;
-    return sum;
-}
 
-void filtering() {
-    TEMPArray[i] = HTSensor.readTemperature();
-    HUMArray[i] = HTSensor.readHumidity();
-    float temp = 0;
-    float hum = 0;
-    switch (i) {
-    case NUM_READINGS:
-        TEMP_2 = arraySUM(TEMPArray);
-        HUM2 = arraySUM(HUMArray);
-        i = -1;
-        break;
-    default:
-        break;
-    }
-    i++;
+void filter() {
+
 }
 
 // the loop function runs over and over again until power down or reset
 void loop() {
     if (millis() >= time_now + period) {
         time_now += period;
+        TEMP1 = int(HTSensor.readTemperature() * 100);
+        HUM1 = int(HTSensor.readHumidity() * 100);
+        //filter();
+        temp_regulator();
+        hum_regulator();
+    }
+    if (redraw) {
+        u8g.firstPage();
+        do {
+            mainview();
+        } while (u8g.nextPage());
+        redraw = false;
     }
 	enc.tick();
 	if (enc.isClick()) {
-		menu++;
+        redraw = true;
+        menu++;
 		if (menu > 2) {
 			menu = 0;
 		}
+        
 	}
-
-    u8g.firstPage();
-	do {
-        mainview();
-    } while (u8g.nextPage());
 
 	if (enc.isRight()) {
 		if (menu == 1) {
-			refTEMP += SMALLSTEP * 0.01;
+			refTEMP += STEPCHANGE;
 		}
 		if (menu == 2) {
-			refHUM += SMALLSTEP * 0.01;
+			refHUM += STEPCHANGE;
 		}
 	    Serial.println("Right");
+        redraw = true;
 	}
 
 	if (enc.isLeft()) {
 		if (menu == 1) {
-		refTEMP -= SMALLSTEP *0.01;
+		refTEMP -= STEPCHANGE;
+
 		}
 		if (menu == 2) {
-			refHUM -= SMALLSTEP * 0.01;
+			refHUM -= STEPCHANGE;
+
 		}
 		Serial.println("Left");
+        redraw = true;
 	}
-    //filtering();
-    //temp_regulator();
-    //hum_regulator();
+
 }
