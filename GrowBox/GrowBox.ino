@@ -68,6 +68,8 @@ void setup() {
 	//enc.setTickMode(AUTO);
     enc.setType(TYPE2);
     //delay(100);
+    TEMP1 = HTSensor.readTemperature() * 100;
+    HUM1 = HTSensor.readHumidity() * 100;
 	Serial.begin(9600);
     u8g.setFont(u8g_font_unifontr);
 	HTSensor.begin();
