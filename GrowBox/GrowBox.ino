@@ -7,7 +7,6 @@
 // the setup function runs once when you press reset or power the board
 
 // libraries
-//#include <encMinim.h>
 #include <Wire.h>
 #include <GyverEncoder.h>
 #include <U8glib.h>
@@ -48,7 +47,12 @@ int refTEMP = 2450;	// reference temperature value
 int hystTEMP = 30;	// hysteresis for temperature
 int hystHUM = 100;	// hysteresis for humiliation
 
+
+int TEMP1SUM = 0;
+int TEMP2SUM = 0;
+int HUM1SUM = 0;
 int TEMP1 = 2350;
+int TEMP2 = 2350;
 int HUM1 = 9000;
 
 bool heating = false;
@@ -196,10 +200,17 @@ void filter() {
 
 // the loop function runs over and over again until power down or reset
 void loop() {
+    TEMP1SUM = 0;
+    HUM1SUM = 0;
     if (millis() >= time_now + period) {
         time_now += period;
-        TEMP1 = int(HTSensor.readTemperature() * 100);
-        HUM1 = int(HTSensor.readHumidity() * 100);
+
+        for(int i = 0; i < NUM_READINGS; i++){
+        TEMP1SUM += int(HTSensor.readTemperature() * 100);
+        HUM1SUM += int(HTSensor.readHumidity() * 100);
+        }
+        TEMP1 = TEMP1SUM / NUM_READINGS;
+        HUM1 = HUM1SUM / NUM_READINGS;
         //filter();
         temp_regulator();
         hum_regulator();
@@ -241,7 +252,7 @@ void loop() {
 			refHUM -= STEPCHANGE;
 
 		}
-		Serial.println("Left");
+		//Serial.println("Left");
         redraw = true;
 	}
 
