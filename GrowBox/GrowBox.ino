@@ -37,9 +37,14 @@ Encoder enc(CLK, DT, SW);
 HTU21D HTSensor;
 
 
-int period = 20000;
+int period = 10000;
 unsigned long time_now = 0;
-
+//Termistor block
+int ThermistorPin = A0;
+float R1 = 10110;
+float logR2, R2, T;
+float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
+//Termistor  block
 
 int refHUM = 9000;	// reference humiliation value
 int refTEMP = 2450;	// reference temperature value
@@ -49,10 +54,10 @@ int hystHUM = 100;	// hysteresis for humiliation
 
 
 int TEMP1SUM = 0;
-int TEMP2SUM = 0;
+float TEMP2SUM = 0;
 int HUM1SUM = 0;
 int TEMP1 = 2350;
-int TEMP2 = 2350;
+float TEMP2 = 0;
 int HUM1 = 9000;
 
 bool heating = false;
@@ -125,7 +130,13 @@ void hum_regulator() {
         drying = false;
     }
 }
-
+float termistor(float Vo){
+  R2 = R1 * (1023.0 / (float)Vo - 1.0);
+  logR2 = log(R2);
+  T = (1.0 / (c1 + c2*logR2 + c3*logR2*logR2*logR2));
+  T = T - 273.15;
+  return T;
+}
 void mainview() {
 
     //Temperature block
@@ -148,8 +159,10 @@ void mainview() {
 
 
     u8g.drawVLine(62, 0, 50); //separating
-
+    u8g.setPrintPos(43, 64);
+    u8g.print(TEMP2);
     //time block
+    /*
     if (RTC.read(tm)) {
         u8g.setPrintPos(43, 64);
         u8g.print(tm.Hour);
@@ -159,6 +172,7 @@ void mainview() {
         u8g.print(tm.Minute);
 
     }
+    */
     //u8g.setPrintPos(43, 64);
     //u8g.print(timetovoid);
     
@@ -202,18 +216,23 @@ void filter() {
 void loop() {
     TEMP1SUM = 0;
     HUM1SUM = 0;
+    TEMP2SUM = 0;
     if (millis() >= time_now + period) {
         time_now += period;
 
         for(int i = 0; i < NUM_READINGS; i++){
-        TEMP1SUM += int(HTSensor.readTemperature() * 100);
-        HUM1SUM += int(HTSensor.readHumidity() * 100);
+          TEMP1SUM += int(HTSensor.readTemperature() * 100);
+          HUM1SUM += int(HTSensor.readHumidity() * 100);
+          TEMP2SUM += termistor(analogRead(ThermistorPin));
+          delay(10);
         }
         TEMP1 = TEMP1SUM / NUM_READINGS;
         HUM1 = HUM1SUM / NUM_READINGS;
+        TEMP2 = TEMP2SUM / NUM_READINGS;
         //filter();
         temp_regulator();
         hum_regulator();
+        redraw = true;
     }
     if (redraw) {
         u8g.firstPage();
