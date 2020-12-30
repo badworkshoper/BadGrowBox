@@ -47,11 +47,11 @@ float logR2, R2, T;
 float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
 //Termistor  block
 
-float refHUM = 90.00;	// reference humiliation value
+float refHUM = 80.00;	// reference humiliation value
 float refTEMP = 24.50;	// reference temperature value
 
 float hystTEMP = 3;	// hysteresis for temperature
-float hystHUM = 5;	// hysteresis for humiliation
+float hystHUM = 20;	// hysteresis for humiliation
 
 
 float TEMP1SUM = 0;
@@ -62,14 +62,13 @@ float HUM1SUM = 0;
 float TEMP1 = 0;
 float TEMP2 = 0;
 
-float HUM1 = 0;
+float HUM1 = 90;
 
 
 bool heating = false;
 bool cooling = false;
 
 bool wetting = false;
-bool drying = false;
 tmElements_t tm;
 
 int menu = 0;
@@ -90,10 +89,10 @@ void setup() {
     TEMP1 = HTSensor.readTemperature();
     HUM1 = HTSensor.readHumidity();
     pinMode(heatRELE, OUTPUT);
-    pinMode(coolRELE, OUTPUT);
+    pinMode(heatRELE, OUTPUT);
+    pinMode(wetRELE, OUTPUT);
     digitalWrite(heatRELE, LOW);
     digitalWrite(coolRELE, LOW);
-    
 }
 
 
@@ -126,15 +125,16 @@ void temp_regulator() {
 void hum_regulator() {
     if (HUM1 <= refHUM - hystHUM * 0.5) {
         wetting = true;
-        drying = false;
+        Serial.print("Wetting on, Humidity = ");
+        Serial.println(HUM1);
+        digitalWrite(wetRELE, !wetting);
+
     }
     if (HUM1 >= refHUM + hystHUM * 0.5) {
         wetting = false;
-        drying = true;
-    }
-    if (HUM1 <= refHUM + hystHUM * 0.5 && HUM1 >= refHUM - hystHUM * 0.5) {
-        wetting = false;
-        drying = false;
+        Serial.print("Wetting off, Humidity = ");
+        Serial.println(HUM1);
+        digitalWrite(wetRELE, !wetting);
     }
 }
 float termistor(float Vo){
@@ -190,14 +190,10 @@ void mainview() {
     u8g.drawFrame(66, 12, 50, 14); // frame ref value
     u8g.setPrintPos(68, 38);
     u8g.print(HUM1);
-    if (drying) {
-        u8g.drawStr(66, 50, "drying");
-    }
-
     if (wetting) {
         u8g.drawStr(66, 50, "wetting");
     }
-    if (wetting == false && drying == false) {
+    if (wetting == false) {
         u8g.drawStr(66, 50, "OK");
     }
 

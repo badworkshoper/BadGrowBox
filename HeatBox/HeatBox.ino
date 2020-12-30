@@ -1,0 +1,114 @@
+/*
+ Name:    HeatBox.ino
+ Created: 07.05.2020 22:29:01
+ Author:  badworkshoper
+*/
+
+// the setup function runs once when you press reset or power the board
+
+// libraries
+#include <Wire.h>
+#include <U8glib.h>
+//some defines
+   //number of readings for avarage
+#define heatRELE 2      //pin for heating relay
+
+U8GLIB_SSD1306_128X32 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI 
+
+
+int readdelay = 500;
+int i = 0;
+unsigned long time_now = 0;
+int readcount = 10;
+float refTEMP = 24.50;
+float TEMP1SUM = 0;
+float TEMP1 = 2350;
+float hystTEMP = 3;  // hysteresis for temperature
+
+bool redraw = false;
+bool heating = false;
+
+
+//Termistor block
+int ThermistorPin = A0;
+int Vo;
+float R1 = 10000; // value of R1 on board
+float logR2, R2, T;
+float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
+//Termistor block
+
+void setup() {
+
+  Serial.begin(9600);
+  u8g.setFont(u8g_font_unifontr);
+  pinMode(heatRELE, OUTPUT); 
+
+}
+
+void temp_regulator() {
+   
+    if (TEMP1 <= refTEMP - hystTEMP * 0.5) {
+        heating = true;
+        digitalWrite(heatRELE, !heating);
+    }
+    if (TEMP1 >= refTEMP + hystTEMP * 0.5) {
+        heating = false;
+        digitalWrite(heatRELE, !heating);
+    }
+    redraw = true;
+}
+
+void mainview() {
+
+    //Temperature block
+    u8g.drawStr(0, 10, "Temperature:");
+    u8g.setPrintPos(2, 22);
+    u8g.print(TEMP1);
+    if (heating) {
+        u8g.drawStr(0, 32, "heating on");
+    }
+    if (!heating) {
+        u8g.drawStr(0, 32, "heating off");
+    }
+}
+
+float termistor(float Vo){
+  Vo = analogRead(ThermistorPin);
+  R2 = R1 * (1023.0 / (float)Vo - 1.0);
+  logR2 = log(R2);
+  T = (1.0 / (c1 + c2*logR2 + c3*logR2*logR2*logR2));
+  T = T - 273.15;
+  return T;
+}
+void CalculateSensors(){
+  TEMP1 = TEMP1SUM / readcount;
+  readcount = 0;
+  TEMP1SUM = 0;
+}
+
+void ReadSensors(){
+  float T1 = termistor(analogRead(ThermistorPin));
+  TEMP1SUM += T1;
+  readcount += 1;
+  //delay(10);
+}
+
+// the loop function runs over and over again until power down or reset
+void loop() {
+    if(millis() >= time_now + readdelay){
+      time_now += readdelay;
+      ReadSensors();
+    }
+    if (readcount >= 10) {
+        CalculateSensors();
+        temp_regulator();
+        redraw = true;
+    }
+    if (redraw) {
+        u8g.firstPage();
+        do {
+            mainview();
+        } while (u8g.nextPage());
+        redraw = false;
+    }
+}
