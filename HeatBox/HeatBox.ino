@@ -9,15 +9,26 @@
 // libraries
 #include <Wire.h>
 #include <U8glib.h>
+#include <GyverEncoder.h>
+
+
+
 //some defines
    //number of readings for avarage
 #define heatRELE 2      //pin for heating relay
+//encoder
+#define SW 9
+#define DT 10
+#define CLK 11
+#define STEPCHANGE 0.25  //step changing slow
+
 
 U8GLIB_SSD1306_128X32 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI 
-
+Encoder enc(CLK, DT, SW);
 
 int readdelay = 500;
 int i = 0;
+int menu = 0;
 unsigned long time_now = 0;
 int readcount = 10;
 float refTEMP = 24.50;
@@ -38,7 +49,7 @@ float c1 = 0.001129148, c2 = 0.000234125, c3 = 0.0000000876741;
 //Termistor block
 
 void setup() {
-
+  enc.setType(TYPE2);
   Serial.begin(9600);
   u8g.setFont(u8g_font_unifontr);
   pinMode(heatRELE, OUTPUT); 
@@ -49,11 +60,11 @@ void temp_regulator() {
    
     if (TEMP1 <= refTEMP - hystTEMP * 0.5) {
         heating = true;
-        digitalWrite(heatRELE, !heating);
+        digitalWrite(heatRELE, heating);
     }
     if (TEMP1 >= refTEMP + hystTEMP * 0.5) {
         heating = false;
-        digitalWrite(heatRELE, !heating);
+        digitalWrite(heatRELE, heating);
     }
     redraw = true;
 }
@@ -61,14 +72,28 @@ void temp_regulator() {
 void mainview() {
 
     //Temperature block
-    u8g.drawStr(0, 10, "Temperature:");
-    u8g.setPrintPos(2, 22);
-    u8g.print(TEMP1);
     if (heating) {
         u8g.drawStr(0, 32, "heating on");
     }
     if (!heating) {
         u8g.drawStr(0, 32, "heating off");
+    }
+    switch (menu) {
+      case 0:
+        u8g.drawStr(0, 10, "Temperature:");
+        u8g.setPrintPos(2, 22);
+        u8g.print(TEMP1);
+        break;
+      case 1:
+        u8g.drawStr(0, 10, "Ref Temperature:");      
+        u8g.setPrintPos(2, 22);
+        u8g.print(refTEMP);
+        break;
+    case 2:
+        u8g.drawStr(0, 10, "Hysterisis:");
+        u8g.setPrintPos(2, 22);
+        u8g.print(hystTEMP);
+       break;
     }
 }
 
@@ -81,9 +106,13 @@ float termistor(float Vo){
   return T;
 }
 void CalculateSensors(){
-  TEMP1 = TEMP1SUM / readcount;
-  readcount = 0;
-  TEMP1SUM = 0;
+
+  if(readcount > 2){
+     TEMP1 = TEMP1SUM / readcount;
+     readcount = 0;
+     TEMP1SUM = 0;
+  }
+ 
 }
 
 void ReadSensors(){
@@ -110,5 +139,36 @@ void loop() {
             mainview();
         } while (u8g.nextPage());
         redraw = false;
+    } 
+  enc.tick();
+  if (enc.isClick()) {
+        if(readcount > 1){
+          CalculateSensors();
+        }
+        redraw = true;
+        menu++;
+    if (menu > 2) {
+      menu = 0;
+    }   
+  }
+
+  if (enc.isRight()) {
+    if (menu == 1) {
+      refTEMP += STEPCHANGE;
     }
+    if (menu == 2) {
+      hystTEMP += STEPCHANGE;
+    }
+    redraw = true;
+  }
+
+  if (enc.isLeft()) {
+    if (menu == 1) {
+    refTEMP -= STEPCHANGE;
+    }
+    if (menu == 2) {
+      hystTEMP -= STEPCHANGE;
+    }
+    redraw = true;
+  }
 }
