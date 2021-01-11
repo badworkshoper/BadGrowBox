@@ -10,6 +10,12 @@
 #include <Wire.h>
 #include <U8glib.h>
 #include <GyverEncoder.h>
+#include <EEPROM.h>
+
+
+#define refTEMPAdress 0
+#define hystTEMPAdress 4
+
 
 
 
@@ -22,23 +28,22 @@
 #define CLK 11
 #define STEPCHANGE 0.25  //step changing slow
 
-
-U8GLIB_SSD1306_128X32 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI 
-Encoder enc(CLK, DT, SW);
-
-int readdelay = 500;
-int i = 0;
-int menu = 0;
+int16_t readdelay = 500;
+uint8_t i = 0;
+uint8_t menu = 0;
 unsigned long time_now = 0;
-int readcount = 10;
-float refTEMP = 24.50;
-float TEMP1SUM = 0;
-float TEMP1 = 2350;
-float hystTEMP = 3;  // hysteresis for temperature
+uint8_t readcount = 10;
+float refTEMP = 29.50;  //referance temperature
+float TEMP1SUM = 0;     //sum for temperature calculation
+float TEMP1 = 23.50;    // Temperature
+float hystTEMP = 0.5;     // hysteresis for temperature
 
 bool redraw = false;
 bool heating = false;
 
+
+U8GLIB_SSD1306_128X32 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI 
+Encoder enc(CLK, DT, SW);
 
 //Termistor block
 int ThermistorPin = A0;
@@ -53,7 +58,18 @@ void setup() {
   Serial.begin(9600);
   u8g.setFont(u8g_font_unifontr);
   pinMode(heatRELE, OUTPUT); 
+  int testvalue = 0;
+  EEPROM.get(0, testvalue);
+  if(testvalue == -1){
+    StoreParams();
+  }
 
+}
+
+
+void StoreParams(){
+    EEPROM.put(refTEMPAdress, refTEMP);
+    EEPROM.put(hystTEMPAdress, hystTEMP);
 }
 
 void temp_regulator() {
@@ -149,6 +165,7 @@ void loop() {
         menu++;
     if (menu > 2) {
       menu = 0;
+      StoreParams();
     }   
   }
 
