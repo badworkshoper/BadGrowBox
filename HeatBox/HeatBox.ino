@@ -63,6 +63,8 @@ void setup() {
   if(testvalue == -1){
     StoreParams();
   }
+  EEPROM.get(refTEMPAdress,refTEMP);
+  EEPROM.get(hystTEMPAdress, hystTEMP);
 
 }
 
