@@ -28,11 +28,11 @@
 #define CLK 11
 #define STEPCHANGE 0.25  //step changing slow
 
-int16_t readdelay = 500;
+int16_t readdelay = 1000;
 uint8_t i = 0;
 uint8_t menu = 0;
 unsigned long time_now = 0;
-uint8_t readcount = 10;
+uint8_t readcount = 20;
 float refTEMP = 29.50;  //referance temperature
 float TEMP1SUM = 0;     //sum for temperature calculation
 float TEMP1 = 23.50;    // Temperature
