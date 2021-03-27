@@ -2,13 +2,9 @@
 #define IRPIN 2
 #define work_min 3
 
-
 unsigned long work_time = 1000L * 60 * work_min;
 unsigned long timer = 0L;
-bool isChanged = false;
 bool isLight = false;
-
-
 
 void setup(){
   pinMode(LEDPIN, OUTPUT);
@@ -17,7 +13,11 @@ void setup(){
 }
 
 void onChange(){
-  isChanged = true;
+  timer = millis() + work_time;
+  if(!isLight){
+    isLight = true;
+    digitalWrite(LEDPIN, HIGH);
+    }
 }
 
 void loop(){
@@ -27,14 +27,5 @@ void loop(){
       isLight = false;
     }
   }
-  if(isChanged){
-    timer = millis() + work_time;
-    if(!isLight){
-      digitalWrite(LEDPIN, HIGH);
-      isLight = true;
-      }
-    isChanged = false;
-  }
-  delay(100);
-  
+  delay(50);
 }
