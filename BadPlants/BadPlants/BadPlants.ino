@@ -2,6 +2,7 @@
 #define PumpPin 13
 #define SoilPin A0
 #define HumPin A2
+#define HumPin_1 A1
 GyverOS<3> OS;
 
 uint32_t watering_time = 5000;
