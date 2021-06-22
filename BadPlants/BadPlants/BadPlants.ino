@@ -5,6 +5,7 @@
 GyverOS<3> OS;
 
 uint32_t watering_time = 5000;
+uint32_t watering_time_2 = 5000;
 uint32_t watering_timer = 0;
 bool watering = false;
 
