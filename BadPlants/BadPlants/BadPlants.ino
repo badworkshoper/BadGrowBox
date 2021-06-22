@@ -5,6 +5,7 @@
 GyverOS<3> OS;
 
 uint32_t watering_time = 5000;
+uint32_t watering_time_2 = 5000;
 uint32_t watering_timer = 0;
 bool watering = false;
 
@@ -14,8 +15,8 @@ bool wetting_state = false;
 
 int NUM_READINGS = 10;
 int soil_moisture = 0;
-
-
+int soil_moisture_2 = 2;
+int soil_moisture_1 = 0;
 int soil_min = 620;
 int soil_max = 900;
 
