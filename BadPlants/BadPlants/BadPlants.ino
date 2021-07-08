@@ -2,7 +2,6 @@
 #define PumpPin 13
 #define SoilPin A0
 #define HumPin A2
-#define HumPin_1 A1
 GyverOS<3> OS;
 
 uint32_t watering_time = 5000;
@@ -12,9 +11,10 @@ bool watering = false;
 int wetting_time = 5000;
 uint32_t wetting_timer = 0;
 bool wetting_state = false;
-bool wetting_state_2 = true;
+
 int NUM_READINGS = 10;
 int soil_moisture = 0;
+
 
 int soil_min = 620;
 int soil_max = 900;
