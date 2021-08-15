@@ -9,7 +9,7 @@
 #include <U8glib.h>
 #include <GyverPWM.h>
 #include <GyverEncoder.h>
-//#include <EEPROM.h>
+#include <EEPROM.h>
 
 //encoder
 #define SW 4
@@ -19,6 +19,10 @@
 #define DutyPin A2
 #define LedPin 7
 #define PWMPin 11
+
+#define refPressureCoefAdress 0
+#define refPressureCutoffAdress 4
+
 
 //Light block
 int8_t HUE = 0;
@@ -62,20 +66,32 @@ void setup() {
   pinMode(PWMPin, OUTPUT);
   PWM_prescaler(PWMPin, 1);
   Serial.begin(9600);
-}
+  int testvalue = 0;
+  EEPROM.get(0, testvalue);
+  if(testvalue == -1){
+    EEPROM.put(refPressureCoefAdress, 1);
+    EEPROM.put(refPressureCutoffAdress, 20);
+  }
+  EEPROM.get(refPressureCoefAdress,pressure_unit);
+  EEPROM.get(refPressureCutoffAdress, pressure_cutoff);
 
+}
+void StoreParams(){
+    EEPROM.put(refPressureCoefAdress, pressure_unit);
+    EEPROM.put(refPressureCutoffAdress, pressure_cutoff);
+}
 
 void ReadPressure() {
   static float pressure_SUM = 0;
   static int i = 0;
   if(i >= read_count){
-    pressure = map(pressure_SUM / (float)i, 0, 1023, 0, 200) * pressure_coef[pressure_unit];
+    pressure = map(pressure_SUM / (float)i, 0, 1023, 0, 163);
     //pressure *= 0.068947572931783;
     //pressure = pressure_SUM / (float)i;
     i = 0;
     pressure_SUM = 0;
     Serial.println(pressure);
-    pressure_overload = pressure * pressure_coef[pressure_unit] < pressure_cutoff * pressure_coef[pressure_unit];
+    pressure_overload = pressure < pressure_cutoff ;
     redraw = true;
   }
   i += 1;
@@ -99,7 +115,7 @@ void DisplayUpdate(){
   if(page == 0){
     display.drawStr(0, 10, menu_items[0]);
     display.setPrintPos(75, 10);
-    display.print(pressure);
+    display.print(pressure * pressure_coef[pressure_unit]);
 
     display.drawStr(0, 24, menu_items[2]);
     display.setPrintPos(75, 24);
@@ -175,9 +191,11 @@ void loop() {
           break;
         case 1:
           pressure_cutoff += step_change * 0.1;
+          StoreParams();
           break;
         case 2:
           pressure_unit = pressure_unit == 3? 0 : pressure_unit + 1;
+          StoreParams();
           break;
       } 
     }

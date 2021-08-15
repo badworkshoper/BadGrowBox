@@ -1,90 +1,141 @@
-#include <GyverOS.h>
-#define PumpPin 13
-#define SoilPin A0
-#define HumPin A2
-GyverOS<3> OS;
+#include <GyverEncoder.h>
+#include <Wire.h>
+#include <U8glib.h>
 
-uint32_t watering_time = 5000;
-uint32_t watering_timer = 0;
+
+#define SW 8
+#define DT 9
+#define CLK 10
+#define PumpPin 11
+
+uint32_t watering_delay = 43200000; //12h
+long timer = 0;
+long watering_timer = 0;
+int watering_time = 5000;
 bool watering = false;
 
-int wetting_time = 5000;
-uint32_t wetting_timer = 0;
-bool wetting_state = false;
+uint8_t menu = 0;
+bool redraw = false;
 
-int NUM_READINGS = 10;
-int soil_moisture = 0;
-
-
-int soil_min = 620;
-int soil_max = 900;
-
+U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_NONE);  // I2C / TWI 
+Encoder enc(CLK, DT, SW);
 
 
 void setup() {
-  // put your setup code here, to run once:
-  OS.attach(0, readSoil, 1000);
-  OS.attach(1, pumpRegulator, 10000);//43200000 - 12h
-  OS.attach(2, wetting, 12000);
-  Serial.begin(9600);
+
+  display.setFont(u8g_font_unifontr);
+  enc.setType(TYPE2);
   pinMode(PumpPin, OUTPUT);
-  pinMode(HumPin, OUTPUT);
+  Serial.begin(9600);
+}
+void DisplayUpdate(){
+    display.drawStr(0, 10, "W.delay");
+    display.setPrintPos(75, 10);
+    display.print(watering_delay/3600000);
+
+    display.drawStr(0, 24, "W.time");
+    display.setPrintPos(75, 24);
+    display.print(watering_time/1000); 
+
+    display.drawStr(0, 38, "Pump");
+    if(watering){
+      display.drawStr(50, 38, "On");
+    }
+    else{
+      display.drawStr(50, 38, "Off");
+    }
+    
+  switch(menu){
+    case 0:
+      break;
+    case 1:
+      display.drawHLine(0, 11, 50);
+      break;
+    case 2:
+      display.drawHLine(0, 25, 50);
+      break;
+     case 3:
+      display.drawHLine(0, 39, 50);
+      break;
+  }
 }
 
-void readSoil(){
-  static int reads = 0;
-  static int read_sum = 0;
-  if(reads <= NUM_READINGS){
-    read_sum += analogRead(SoilPin);
-    reads++;
-  }
-  if(reads >= NUM_READINGS){
-    soil_moisture = map(read_sum / NUM_READINGS, soil_min, soil_max, 100, 0);
-    //Serial.println(soil_moisture);
-    read_sum = 0;
-    reads = 0;
-  }
-}
 
-void wetting(){
 
-  if(!wetting_state){
-    wetting_state = true;
-    analogWrite(HumPin, 1023);
-    delay(100);
-    analogWrite(HumPin, 0);
-    wetting_timer = millis();
-    Serial.println("Wetting on");
+void pump(bool state){
+  watering = state;
+  switch(state){
+    case true:
+      watering_timer = millis();
+      Serial.println("Pump On");
+      break;
+    case false:
+      timer = millis();
+      Serial.println("Pump Off");
+      break; 
   }
-}
-
-void pumpRegulator(){
-  watering = true;
-  watering_timer = millis();
+  redraw = true;      
   digitalWrite(PumpPin, watering);
-  
-  //Serial.println("watering on");
 }
 
-void loop() {
-  OS.tick();
-  if(millis() - watering_timer >= watering_time){
-    watering_timer = millis();
-    if(digitalRead(PumpPin) == true){
-      watering = false;
-      digitalWrite(PumpPin, watering);
-      //Serial.println("watering off");
-    }
+void loop() 
+{
+  if(!watering && millis() - timer >= watering_delay){
+    pump(true);
   }
-  if(millis() - wetting_timer >= wetting_time){
-    wetting_timer = millis();
-    if(wetting_state){
-      analogWrite(HumPin, 1023);
-      delay(100);
-      analogWrite(HumPin, 0);
-      Serial.println("Wetting off");
-      wetting_state = false;
-    }
+  enc.tick();
+  if(watering && millis() - watering_timer >= watering_time ){
+    pump(false);  
   }
-  // put your main code here, to run repeatedly:
+  if (redraw) {
+        display.firstPage();
+        do {
+            DisplayUpdate();
+        } while (display.nextPage());
+        redraw = false;
+    }
+
+  if (enc.isClick()) {
+    if(menu < 3){
+      menu++;
+    }
+    else{
+      menu = 0;
+    }
+    redraw = true;
+  }
+
+  
+  if(enc.isHolded()){
+    pump(true);
+    redraw = true;
+  }
+  
+  if(enc.isRight()){
+    switch (menu){
+      case 0:  
+        break;
+      case 1:
+        watering_delay += 3600000;
+        break;
+      case 2:
+        watering_time += 1000;
+        break;
+     }
+     redraw = true; 
+   }
+
+  if(enc.isLeft()){
+    switch (menu){
+      case 0: 
+        break;
+      case 1:
+        watering_delay -= 3600000;
+        break;
+      case 2:
+        watering_time = watering_time < 0 ? 1000 : watering_time - 1000;
+        break;
+     }
+     redraw = true; 
+   }
 }
