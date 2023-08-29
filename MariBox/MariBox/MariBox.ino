@@ -1,10 +1,9 @@
 #include <GyverEncoder.h>
-#include <Wire.h>
 #include <U8glib.h>
 #include <EEPROM.h>
 
 #define INIT_ADDR 1023  // номер резервной ячейки
-#define INIT_KEY 4     // ключ первого запуска. 0-254, на выбор
+#define INIT_KEY 1     // ключ первого запуска. 0-254, на выбор
 
 #define SW 8
 #define DT 9
@@ -45,6 +44,7 @@ struct Settings{
   uint8_t morning_start = 8;
   uint8_t light_time = 12;
   bool full_light = true;
+  bool use_light = true;
 };
 
 Settings settings;
@@ -107,6 +107,7 @@ void setup() {
     settings.morning_start = 8;
     settings.light_time = 12;
     settings.full_light = true;
+    settings.use_light = true;
 
     EEPROM.put(0, settings);
   }
@@ -115,7 +116,7 @@ void setup() {
   enc.setType(TYPE2);
   enc.setFastTimeout(50);
   // pinMode(PumpPin, OUTPUT);
-  // Serial.begin(9600);
+  Serial.begin(9600);
 
 }
 
@@ -138,16 +139,20 @@ void DisplayUpdate(){
       display.print(vent_state? "On" :"Off");
       break;
     case 1:
-      display.drawStr(0, 14, "Light Time");
+      display.drawStr(0, 14, "Use Light");
       display.setPrintPos(95, 14);
-      display.print(settings.light_time);
-      
+      display.print(settings.use_light? "On" :"Off");
+
       display.drawStr(0, 28, "Full Light");
       display.setPrintPos(95, 28);
       display.print(settings.full_light? "On" :"Off");
-
-      display.drawStr(0, 42, "Morning At");
+      
+      display.drawStr(0, 42, "Light Time");
       display.setPrintPos(95, 42);
+      display.print(settings.light_time);
+
+      display.drawStr(0, 56, "Morning At");
+      display.setPrintPos(95, 56);
       display.print(settings.morning_start);
       break;
     case 2:
@@ -159,26 +164,8 @@ void DisplayUpdate(){
       display.setPrintPos(95, 28);
       display.print(settings.pump_always_on? "Yes" :"No");
 
-      display.drawStr(0, 42, "Pump Delay");
-      display.setPrintPos(95, 42);
-      display.print(settings.pump_delay);
-
-      if(settings.pump_uptime / 60000 < 1){
-        display.drawStr(0, 56, "Pump Up.t,s:");
-        display.setPrintPos(95, 56);
-        display.print(settings.pump_uptime/1000);     
-      }
-      else if(settings.pump_uptime / 60000 >= 1 && settings.pump_uptime / 60000 <= 59){
-        display.drawStr(0, 56, "Pump Up.t,m:");
-        display.setPrintPos(95, 56);
-        display.print(settings.pump_uptime/60000);     
-      }
-      else{
-        display.drawStr(0, 56, "Pump Up.t,h:");
-        display.setPrintPos(95, 56);
-        display.print(settings.pump_uptime / 3600000);     
-
-      }
+      DisplayMSSettings("Pump Delay", settings.pump_delay, 0, 42, 110, 42);
+      DisplayMSSettings("Pump Up.t", settings.pump_uptime, 0, 56, 110, 56);
       break;
     case 3:
       display.drawStr(0, 14, "Use Vent");
@@ -189,13 +176,9 @@ void DisplayUpdate(){
       display.setPrintPos(95, 28);
       display.print(settings.vent_always_on? "Yes" :"No");
 
-      display.drawStr(0, 42, "Vent Delay");
-      display.setPrintPos(95, 42);
-      display.print(settings.pump_delay);
+      DisplayMSSettings("Vent Delay", settings.vent_delay, 0, 42, 110, 42);
+      DisplayMSSettings("Vent Up.t", settings.vent_uptime, 0, 56, 110, 56);
 
-      display.drawStr(0, 56, "Vent Uptime");
-      display.setPrintPos(95, 56);
-      display.print(settings.vent_uptime);      
       break;
     case 4:
       display.drawStr(0, 14, "Use Fan");
@@ -206,13 +189,8 @@ void DisplayUpdate(){
       display.setPrintPos(95, 28);
       display.print(settings.fan_always_on? "Yes" :"No");
 
-      display.drawStr(0, 42, "Fan Delay");
-      display.setPrintPos(95, 42);
-      display.print(settings.fan_delay);
-
-      display.drawStr(0, 56, "Fan Uptime");
-      display.setPrintPos(95, 56);
-      display.print(settings.fan_uptime);
+      DisplayMSSettings("Fan Delay", settings.fan_delay, 0, 42, 110, 42);
+      DisplayMSSettings("Fan Up.t", settings.fan_uptime, 0, 56, 110, 56);
       break;
     case 5:
       display.drawStr(0, 14, "Use Aero");
@@ -222,14 +200,9 @@ void DisplayUpdate(){
       display.drawStr(0, 28, "Aero Always");
       display.setPrintPos(95, 28);
       display.print(settings.aeration_always_on? "Yes" :"No");
-
-      display.drawStr(0, 42, "Aero Delay");
-      display.setPrintPos(95, 42);
-      display.print(settings.aeration_delay);
-
-      display.drawStr(0, 56, "Aero Uptime");
-      display.setPrintPos(95, 56);
-      display.print(settings.aeration_uptime);      
+      
+      DisplayMSSettings("Aero Delay", settings.aeration_delay, 0, 42, 110, 42);
+      DisplayMSSettings("Aero Up.t", settings.aeration_uptime, 0, 56, 110, 56);     
       break;
     case 6:
       display.drawStr(0, 14, "Pump");
@@ -248,46 +221,147 @@ void DisplayUpdate(){
       display.setPrintPos(70, 56);
       display.print(settings.pump_always_on? "Always": "OnLight");      
       break;
+    default:
+      break;
   }
-
+}
+void DisplayMSSettings(String text, long parameter, u8g_uint_t  xtext, u8g_uint_t  ytext, u8g_uint_t  xparam, u8g_uint_t  yparam){
+  int divider = 1000;
+  String smh = ",s:";
+  if(parameter / 60000 < 1)
+  {
+    int divider = 1000;
+    smh = ",s:"; 
+  }
+  else if(parameter / 60000 >= 1 && parameter / 60000 <= 59)
+  { 
+    divider = 60000;
+    smh = ",m:";
+  }
+  else
+  {
+    divider = 3600000;
+    smh = ",h:";
+  }
+  text += smh;
+  display.drawStr(xtext, ytext, text.c_str());
+  display.setPrintPos(xparam, yparam);
+  display.print(parameter / divider);
+  Serial.println(parameter / divider);
 }
 
 
-void ChangeValue(bool increase){
+void ChangeValue(bool increase, bool fast){
   switch (parameter){
+    case 4:
+      settings.use_light = !settings.use_light;
+      break;
+    case 5:
+      settings.full_light = !settings.full_light;
+      break;
+    case 6:
+      settings.light_time = TimeSettingsTweak(settings.light_time, increase, fast);
+      break;
+    case 7:
+      settings.morning_start = TimeSettingsTweak(settings.morning_start, increase, fast);
+      break;
+    case 8:
+      settings.use_pump = !settings.use_pump;
+      break;
+    case 9:
+      settings.pump_always_on = !settings.pump_always_on;
+      break;
+    case 10:
+      settings.pump_delay = MilisTimeTweak(settings.pump_delay, increase, fast);
+      break;
     case 11:
-      if(settings.pump_uptime / 60000 < 1){
-      settings.pump_uptime = increase? settings.pump_uptime + 1000 : settings.pump_uptime - 1000;
-      }
-      else if(settings.pump_uptime / 60000 >= 1 && settings.pump_uptime / 60000 <= 59){
-        settings.pump_uptime = increase? settings.pump_uptime + 60000 : settings.pump_uptime - 60000;
-      }
-      else{
-        settings.pump_uptime = increase? settings.pump_uptime + 3600000 : settings.pump_uptime - 3600000;
-      }
+      settings.pump_uptime = MilisTimeTweak(settings.pump_uptime, increase, fast);
+      break;
+    case 12:
+      settings.use_vent = !settings.use_vent;
+      break;
+    case 13:
+      settings.vent_always_on = !settings.vent_always_on;
+      break;
+    case 14:
+      settings.vent_delay = MilisTimeTweak(settings.vent_delay, increase, fast);
+      break;
+    case 15:
+      settings.vent_uptime = MilisTimeTweak(settings.vent_uptime, increase, fast);
+      break;
+    case 16:
+      settings.use_fan = !settings.use_fan;
+      break;
+    case 17:
+      settings.fan_always_on = !settings.fan_always_on;
+      break;
+    case 18:
+      settings.fan_delay = MilisTimeTweak(settings.fan_delay, increase, fast);
+      break;
+    case 19:
+      settings.fan_uptime = MilisTimeTweak(settings.fan_uptime, increase, fast);
+      break;
+    case 20:
+      settings.use_aeration = !settings.use_aeration;
+      break;
+    case 21:
+      settings.aeration_always_on = !settings.aeration_always_on;
+      break;
+    case 22:
+      settings.aeration_delay = MilisTimeTweak(settings.aeration_delay, increase, fast);
+      break;
+    case 23:
+      settings.aeration_uptime = MilisTimeTweak(settings.aeration_uptime, increase, fast);
+      break;
+    case 24:
+      settings.pump_only_on_light = !settings.pump_only_on_light;
+      break;
+    case 25:
+      settings.vent_only_on_light = !settings.vent_only_on_light;
+      break;
+    case 26:
+      settings.fan_only_on_light = !settings.fan_only_on_light;
+      break;
+    case 27:
+      settings.aeration_only_on_light = !settings.aeration_only_on_light;
       break;
     default:
       break;
   }
 }
-void ChangeValueFast(bool increase){
-  switch (parameter){
-    case 11:
-      if(settings.pump_uptime / 60000 < 1){
-      settings.pump_uptime = increase? settings.pump_uptime + (10 * 1000) : settings.pump_uptime - (10 * 1000);
-      }
-      else if(settings.pump_uptime / 60000 >= 1 && settings.pump_uptime / 60000 <= 59){
-        settings.pump_uptime = increase? settings.pump_uptime + (60000 * 10) : settings.pump_uptime - (60000 * 10);
-      }
-      else{
-        settings.pump_uptime = increase? settings.pump_uptime + (3600000 * 10) : settings.pump_uptime - (3600000 * 10);
-      }
-      break;
-    default:
-      break;
-  }
 
+uint8_t TimeSettingsTweak(uint8_t param_to_tweak, bool increase, bool fast){
+  param_to_tweak = increase? param_to_tweak + (fast ? 4 : 1) : param_to_tweak - (fast ? 4 : 1);
+  if(param_to_tweak < 0)
+  {
+    param_to_tweak = 0;
+  }
+  else if(param_to_tweak > 23)
+  {
+    param_to_tweak = 23;
+  }
+  return param_to_tweak;
 }
+
+long MilisTimeTweak(long param_to_tweak, bool increase, bool fast){
+  if(param_to_tweak / 60000 < 1)
+  {
+    
+    param_to_tweak = increase? param_to_tweak + (fast? (10000) : 1000) : param_to_tweak - (fast? (10000) : 1000);
+    
+  }
+  else if(param_to_tweak / 60000 >= 1 && param_to_tweak / 60000 <= 59)
+  {
+    param_to_tweak = increase? param_to_tweak + (fast? (60000 * 10) : 60000) : param_to_tweak - (fast? (60000 * 10) : 60000);
+  }
+  else
+  {
+    param_to_tweak = increase? param_to_tweak + (fast? (3600000 * 10): 3600000) : param_to_tweak - (fast? (3600000 * 10): 3600000);
+  }
+  if(param_to_tweak < 0) param_to_tweak = 0;
+  return param_to_tweak;
+}
+
 
 void pump(bool state){
   pump_state = state;
@@ -335,12 +409,12 @@ void loop()
     }
     redraw = true;
   }
-  
+
   if(enc.isRight())
   {
     if(modify)
     {
-      ChangeValue(true);
+      ChangeValue(true, false);
     }
     else
     {
@@ -353,7 +427,7 @@ void loop()
   {
     if(modify)
     {
-      ChangeValueFast(true);
+      ChangeValue(true, true);
     }
     redraw = true;
   }
@@ -361,7 +435,7 @@ void loop()
   {
     if(modify)
     {
-      ChangeValueFast(false);
+      ChangeValue(false, true);
     }
     redraw = true;
   } 
@@ -369,7 +443,7 @@ void loop()
   {
     if(modify)
     {
-      ChangeValue(false);
+      ChangeValue(false, false);
     }
     else
     {
